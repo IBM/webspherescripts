@@ -1,0 +1,356 @@
+# *****************************************************************************
+#  (c) Copyright IBM Corporation 2024.
+# 
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# ****************************************************************************
+
+# pmi.jy: Start, stop, query, or configure PMI/TPV on a set of WebSphere Application Server traditional servers
+
+import sys
+import com.ibm.ws.tpv.engine.UserPreferences as UserPreferences
+import com.ibm.ws.tpv.engine.utils.ServerBean as ServerBean
+import jarray
+import javax.management as mgmt
+
+def usage():
+  print "usage: wsadmin -lang jython -f pmi.jy -action [start|stop|list|setlevel] [-node NODE] [-server SERVER] [-pmilevel none|basic|custom|extended] [-pmicustom CUSTOM]"
+  print "       "
+  print "       If neither -node nor -server are specified, then all application servers on all nodes will be executed"
+  print "       If -node is specified but -server isn't, then all application servers on the node will be executed"
+  print "       If -node is specified but -server isn't, then all application servers on the node will be executed"
+  print "       "
+  print "       If -pmilevel is set: 1) with -action start, set at runtime, 2) with -action setlevel, save permanent configuration changes (server must be running though)"
+  print "       "
+  print "       If -pmilevel is custom, then specify the counters with -pmicustom (applied recursively)"
+  print "       Built-in suggestions may be chosen from: sib"
+  print "       To find custom PMI counters, either:"
+  print "       1. Enable custom counters at runtime through the console and then dump them with AdminControl.invoke(AdminControl.completeObjectName('type=Perf,node=NODE,process=SERVER,*'), 'getCustomSetString') and clean up to remove redundant recursive entries"
+  print "       2. Find in the javadocs, e.g. https://www.ibm.com/docs/api/v1/content/SSAW57_9.0.5/com.ibm.websphere.javadoc.doc/web/apidocs/constant-values.html?view=embed#com.ibm.websphere.pmi.stat.WSJCAConnectionPoolStats.AllocateCount"
+  print "       See the initialization in the source code of the pmicustom variable for an example"
+  print "       "
+  print "       Examples:"
+  print "       wsadmin.sh -username wsadmin -lang jython -f pmi.jy -action list"
+  print "       wsadmin.sh -username wsadmin -lang jython -f pmi.jy -action start -server server1"
+  print "       wsadmin.sh -username wsadmin -lang jython -f pmi.jy -action start -node node1"
+  print "       wsadmin.sh -username wsadmin -lang jython -f pmi.jy -action start -node node1 -pmilevel custom"
+  print "       wsadmin.sh -username wsadmin -lang jython -f pmi.jy -action start -node node1 -pmilevel custom -pmicustom sib"
+  print "       wsadmin.sh -username wsadmin -lang jython -f pmi.jy -action start -node node1 -pmilevel custom -pmicustom \"jvmRuntimeModule=*:threadPoolModule=3,4,6,7,8\""
+  print "       "
+  print "       Notes:"
+  print "       1. Confirmed experimentally that setting a custom statistic that includes components that don't exist does not cause any problems and existing ones will still be set"
+  print "       2. When a log starts, the file will be PROFILE/logs/tpv/tpv_SERVER_X_Y.xml"
+  print "       3. When a log stops or the server gracefully stops, the file will be PROFILE/logs/tpv/tpv_SERVER_X_Y.zip"
+  print "       4. Confirmed experimentally that setting a custom statistic that includes components that don't exist does not cause any problems and existing ones will still be set"
+  print "       5. https://www.ibm.com/docs/en/was/latest?topic=viewer-logging-performance-data-tivoli-performance"
+  print "       6. https://www.ibm.com/docs/api/v1/content/SSAW57_9.0.5/com.ibm.websphere.javadoc.doc/web/mbeanDocs/Perf.html"
+  print "       "
+  sys.exit(1)
+
+def info(obj):
+  print "INFO [%s] %s" % (time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime()), str(obj))
+
+def warning(obj):
+  print "WARN [%s] %s" % (time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime()), str(obj))
+
+def error(obj):
+  print "ERR  [%s] %s" % (time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime()), str(obj))
+
+sType = "APPLICATION_SERVER"
+action = "start"
+targetNode = ""
+targetApplicationServer = ""
+user = "tpvlogging"
+filename = "tpv"
+duration = 999999
+fileSize = 52428800
+numFiles = 5
+outputType = "xml" # or "bin"
+bufferSize = 40
+pmilevel = ""
+pmicustom_builtsin = {}
+pmicustom_builtsin["common1"] = "beanModule=1,2,9,11,12,25,26,34,35,36,37,38,39,40,41,42,43,44,27,18,29,28:connectionPoolModule=1,2,5,6,7,9,12,13:j2cModule=1,2,5,6,7,12,13:jvmRuntimeModule=*:odrStatModule=*,1,2,3,4,5,6:servletSessionsModule=6,7:threadPoolModule=3,4,6,7,8:transactionModule=4,14,16:webAppModule=11,13"
+pmicustom_builtsin["sib"] = "StatGroup.SIBService=1543,1530,1540,1541,1542,1544,1545,1546,1551,1550,1552,1508,1509,1510,1511,1556,1557,1558,18,2,4,5,11,19,20,21,22:StatGroup.SIBService>StatGroup.Communications>StatGroup.Clients>StatGroup.ClientsStandard=561,560,563,562:beanModule=1,2,9,11,12,25,26,34,35,36,37,38,39,40,41,42,43,44,27,18,29,28:connectionPoolModule=1,2,5,6,7,9,12,13:j2cModule=1,2,5,6,7,12,13:jvmRuntimeModule=*:odrStatModule=*,1,2,3,4,5,6:servletSessionsModule=6,7:threadPoolModule=3,4,6,7,8:transactionModule=4,14,16:webAppModule=11,13"
+pmicustom = pmicustom_builtsin["common1"]
+help = 0
+refreshRate = 30
+affectedCount = 0
+verbose = 0
+listed = 0
+
+l = len(sys.argv)
+i = 0
+while i < l:
+  arg = sys.argv[i]
+  if arg == "-help" or arg == "-h" or arg == "-usage" or arg == "-?":
+    help = 1
+  if arg == "-action":
+    action = sys.argv[i + 1]
+  if arg == "-node":
+    targetNode = sys.argv[i + 1]
+  if arg == "-server":
+    targetApplicationServer = sys.argv[i + 1]
+  if arg == "-userprefs":
+    user = sys.argv[i + 1]
+  if arg == "-filename":
+    filename = sys.argv[i + 1]
+  if arg == "-duration":
+    duration = int(sys.argv[i + 1])
+  if arg == "-filesize":
+    fileSize = int(sys.argv[i + 1])
+  if arg == "-numfiles":
+    numFiles = int(sys.argv[i + 1])
+  if arg == "-buffersize":
+    bufferSize = int(sys.argv[i + 1])
+  if arg == "-refreshrate":
+    refreshRate = int(sys.argv[i + 1])
+  if arg == "-outputtype":
+    outputType = sys.argv[i + 1]
+  if arg == "-pmilevel":
+    pmilevel = sys.argv[i + 1]
+    if pmilevel == "all":
+      warning("WARNING: all is not recommended: \"Enabling all statistics for PMI might degrade server performance. In version 9.0.5.17 and later, a warning message displays in the administrative console when you select this option.\" https://www.ibm.com/docs/en/was-nd/latest?topic=console-performance-monitoring-infrastructure-settings")
+  if arg == "-pmicustom":
+    pmicustom = sys.argv[i + 1]
+    if "=" not in pmicustom:
+      pmicustom = pmicustom_builtsin[pmicustom]
+  if arg == "-verbose":
+    verbose = 1
+  i = i + 1
+
+if help == 1:
+  usage()
+  
+if len(user) == 0:
+  print ""
+  print "ERROR: -userprefs must be specified (see usage below)"
+  print ""
+  usage()
+
+def getExceptionText(typ, value, tb):
+  value = `value`
+  sd = `tb.dumpStack()`
+  sd = sd.replace("\\\\","/")
+  i = sd.rfind("  File ")
+  j = sd.rfind(", line ")
+  k = sd.rfind(", in ")
+  locn = ""
+  if(i>0 and j>0 and k>0):
+    file = sd[i+7:j]
+    line = sd[j+7:k]
+    func = sd[k+4:-3]
+    locn = "Function="+func+"  Line="+line+"  File="+file
+  return value+" "+locn
+
+def convertToList( inlist ):
+  outlist = []
+  clist = None
+  if (len(inlist) > 0): 
+    if (inlist[0] == '[' and inlist[len(inlist) - 1] == ']'): 
+      if (inlist[1] == "\"" and inlist[len(inlist)-2] == "\""):
+        clist = inlist[1:len(inlist) -1].split(")\" ")
+      else:
+        clist = inlist[1:len(inlist) - 1].split(" ")
+    else:
+      clist = inlist.split(java.lang.System.getProperty("line.separator"))
+  if clist != None:
+    for elem in clist:
+      elem = elem.rstrip();
+      if (len(elem) > 0):
+        if (elem[0] == "\"" and elem[len(elem) -1] != "\""):
+          elem = elem+")\""
+        outlist.append(elem)
+  return outlist
+
+def listNodes():
+  nodes = AdminConfig.list("Node")
+  nodeList = convertToList(nodes)
+  return nodeList
+
+def listServers(serverType="", nodeName=""):
+  optionalParamList = []
+  if (len(serverType) > 0):
+    optionalParamList = ['-serverType', serverType]
+  if (len(nodeName) > 0):
+    node = AdminConfig.getid("/Node:" +nodeName+"/")
+    optionalParamList = optionalParamList + ['-nodeName', nodeName]
+  servers = AdminTask.listServers(optionalParamList)
+  servers = convertToList(servers)
+  newservers = []
+  for aServer in servers:
+    sname = aServer[0:aServer.find("(")]
+    nname = aServer[aServer.find("nodes/")+6:aServer.find("servers/")-1]
+    sid = AdminConfig.getid("/Node:"+nname+"/Server:"+sname)
+    if (newservers.count(sid) <= 0):
+      newservers.append(sid)
+  return newservers
+
+if verbose:
+  print "Action: " + action
+  print "User: " + user
+  print "Node: " + targetNode
+  print "Server: " + targetApplicationServer
+  print "File name: " + filename
+  print "Duration: " + str(duration)
+  print "File Size: " + str(fileSize)
+  print "Historical Files: " + str(numFiles)
+  print "Output type: " + outputType
+  print "Refresh Rate: " + str(refreshRate)
+
+nodeList = listNodes()
+
+for nodeObject in nodeList:
+
+  nodeName = nodeObject.split("(")[0]
+
+  if len(targetNode) > 0 and targetNode.lower() != nodeName.lower():
+    if verbose:
+      print "Skipping node " + nodeName + " because it did not match targetNode"
+    continue
+
+  info("Processing node: " + nodeName)
+
+  try:
+    # build list of Application Servers in the Node
+    serverList = listServers(sType,nodeName)
+  except:
+    typ, val, tb = sys.exc_info()
+    value = `val`
+    sd = `tb.dumpStack()`
+    sd = sd.replace("\\\\","/")
+    print "Could not process node. Probably the DMGR (which is ok to skip)? Continuing with the other nodes... " + value + " " + sd
+    continue
+
+  if verbose:
+    print "Number of servers: " + str(len(serverList))
+
+  for serverObject in serverList:
+    serverName = serverObject.split("(")[0]
+
+    if len(targetApplicationServer) > 0 and targetApplicationServer.lower() != serverName.lower():
+      if verbose:
+        print "Skipping server " + serverName + " (node " + nodeName + ")"
+      continue
+
+    prefs = UserPreferences()
+    prefs.setServerName(serverName)
+    prefs.setNodeName(nodeName)
+    prefs.setLoggingDuration(duration)
+    prefs.setLogFileSize(fileSize)
+    prefs.setNumLogFiles(numFiles)
+    prefs.setTpvLogFormat(outputType)
+    prefs.setLogFileName(filename)
+    prefs.setBufferSize(bufferSize)
+    prefs.setUserId(user)
+    prefs.setRefreshRate(refreshRate)
+
+    params = [prefs]
+    sig = ["com.ibm.ws.tpv.engine.UserPreferences"]
+
+    target = "node=" + nodeName
+    name = AdminControl.completeObjectName("type=TivoliPerfEngine," + target + ",*")
+    mbeanObjectName = mgmt.ObjectName(name)
+
+    display = nodeName + "\\" + serverName
+
+    if action == "start":
+      info("Calling TivoliPerfEngine.monitorServer on " + display)
+      AdminControl.invoke_jmx(mbeanObjectName, "monitorServer", params, sig)
+
+      if pmilevel != "":
+
+        try:
+          target = target + ",process=" + serverName
+          perfname = AdminControl.completeObjectName("type=Perf," + target + ",*")
+          info("Calling Perf.setStatisticSet on " + display)
+          AdminControl.invoke(perfname, "setStatisticSet", pmilevel)
+          if pmilevel == "custom":
+            info("Calling Perf.setCustomSetString on " + display)
+            AdminControl.invoke(perfname, "setCustomSetString", [pmicustom, java.lang.Boolean('true')], ['java.lang.String', 'java.lang.Boolean'])
+        except:
+          # Server is probably stopped
+          typ, val, tb = sys.exc_info()
+          value = `val`
+          sd = `tb.dumpStack()`
+          sd = sd.replace("\\\\","/")
+          if verbose:
+            print "Error calling Perf.setStatisticSet for " + value + " " + sd
+          continue
+
+      info("Calling TivoliPerfEngine.startLogging on " + display)
+      AdminControl.invoke_jmx(mbeanObjectName, "startLogging", params, sig)
+
+      affectedCount = affectedCount + 1
+
+    elif action == "stop":
+      info("Calling TivoliPerfEngine.stopLogging on " + display)
+      AdminControl.invoke_jmx(mbeanObjectName, "stopLogging", params, sig)
+
+      info("Calling TivoliPerfEngine.disableServer on " + display)
+      AdminControl.invoke_jmx(mbeanObjectName, "disableServer", params, sig)
+
+      affectedCount = affectedCount + 1
+
+    elif action == "list":
+
+      if listed == 0:
+        listed = 1
+        servers = AdminControl.invoke(name, "getMonitoredServers", user)
+        if len(servers) > 0:
+          for server in servers.split("\n"):
+            if listed == 1:
+              print "Monitored Servers (by " + user + ")"
+              print "==============================="
+            listed = listed + 1
+            pieces = server.split(".")
+            bean = ServerBean(pieces[0], pieces[1])
+            res = AdminControl.invoke_jmx(mbeanObjectName, "isServerLogging", [bean], ["com.ibm.ws.tpv.engine.utils.ServerBean"])
+            perftarget = "node=" + nodeName + ",process=" + pieces[1]
+            perfname = AdminControl.completeObjectName("type=Perf," + perftarget + ",*")
+            info(server + " ; Logging=" + str(res) + " ; Level=" + AdminControl.invoke(perfname, "getStatisticSet") + " ; Custom Set=" + AdminControl.invoke(perfname, "getCustomSetString"))
+      
+      target = target + ",process=" + serverName
+      try:
+        perfname = AdminControl.completeObjectName("type=Perf," + target + ",*")
+        info(serverName + ": Runtime Level=" + AdminControl.invoke(perfname, "getStatisticSet") + " ; Runtime Custom Set=" + AdminControl.invoke(perfname, "getCustomSetString"))
+        print ""
+      except:
+        # Server is probably stopped
+        typ, val, tb = sys.exc_info()
+        value = `val`
+        sd = `tb.dumpStack()`
+        sd = sd.replace("\\\\","/")
+        if verbose:
+          print "Error querying current statistics for " + target + " " + value + " " + sd
+        continue
+
+    elif action == "setlevel":
+      target = target + ",process=" + serverName
+      perfname = AdminControl.completeObjectName("type=Perf," + target + ",*")
+      # none, basic, extended, all
+      info("Setting PMI level to " + pmilevel + " on " + serverName)
+      AdminControl.invoke(perfname, "setStatisticSet", pmilevel)
+      if pmilevel == "custom":
+        AdminControl.invoke(perfname, "setCustomSetString", [pmicustom, java.lang.Boolean('true')], ['java.lang.String', 'java.lang.Boolean'])
+      AdminControl.invoke(perfname, "savePMIConfiguration")
+
+      affectedCount = affectedCount + 1
+
+    elif action == "debug":
+      info("Debug")
+
+    else:
+      error("Unknown action " + action)
+
+  print ""
+
+info("Script finished. " + str(affectedCount) + " servers touched.")
