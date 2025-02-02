@@ -52,8 +52,9 @@ def usage():
   print "       2. When a log starts, the file will be PROFILE/logs/tpv/tpv_SERVER_X_Y.xml"
   print "       3. When a log stops or the server gracefully stops, the file will be PROFILE/logs/tpv/tpv_SERVER_X_Y.zip"
   print "       4. Confirmed experimentally that setting a custom statistic that includes components that don't exist does not cause any problems and existing ones will still be set"
-  print "       5. https://www.ibm.com/docs/en/was/latest?topic=viewer-logging-performance-data-tivoli-performance"
-  print "       6. https://www.ibm.com/docs/api/v1/content/SSAW57_9.0.5/com.ibm.websphere.javadoc.doc/web/mbeanDocs/Perf.html"
+  print "       5. WASX8011W: AdminTask object is not available: Run from the DMGR profile instead of the WebSphere root"
+  print "       6. https://www.ibm.com/docs/en/was/latest?topic=viewer-logging-performance-data-tivoli-performance"
+  print "       7. https://www.ibm.com/docs/api/v1/content/SSAW57_9.0.5/com.ibm.websphere.javadoc.doc/web/mbeanDocs/Perf.html"
   print "       "
   sys.exit(1)
 
