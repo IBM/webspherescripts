@@ -14,7 +14,7 @@
 #  limitations under the License.
 # ****************************************************************************
 
-# diagnostictrace.jy: Start diagnostic trace on a set of WebSphere Application Server traditional servers
+# diagnostictrace.jy: Set or list runtime diagnostic trace on a set of WebSphere Application Server traditional servers
 
 import sys
 import time
