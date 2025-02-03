@@ -14,7 +14,7 @@
 #  limitations under the License.
 # ****************************************************************************
 
-# diagnostictrace.jy: Set or list runtime diagnostic trace on a set of WebSphere Application Server traditional servers
+# trace.jy: Set or list runtime diagnostic trace on a set of WebSphere Application Server traditional servers
 
 import sys
 import time
@@ -25,7 +25,7 @@ def usage(error):
     print "ERROR: " + error
     print ""
 
-  print "usage: wsadmin -lang jython -f diagnostictrace.jy --action [list|set] [--node NODE] [--server SERVER] [--trace SPECIFICATION] [--serverType APPLICATION_SERVER]"
+  print "usage: wsadmin -lang jython -f trace.jy --action [list|set] [--node NODE] [--server SERVER] [--trace SPECIFICATION] [--serverType APPLICATION_SERVER]"
   print "  If neither -node nor -server are specified, then all servers on all nodes will be processed."
   print "  If -node is specified but -server isn't, then all application servers on the node will be processed."
   print "  Use --serverType APPLICATION_SERVER to skip the deployment manager and node agents."
@@ -40,8 +40,8 @@ def warning(obj):
 def error(obj):
   print "ERR  [%s] %s" % (time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime()), str(obj))
 
-NAME = "diagnostictrace.jy"
-VERSION = "0.1.20210518"
+NAME = "trace.jy"
+VERSION = "0.1.20250203"
 verbose = 0
 action = "list"
 targetNode = ""

@@ -55,6 +55,7 @@ def usage():
   print "       5. WASX8011W: AdminTask object is not available: Run from the DMGR profile instead of the WebSphere root"
   print "       6. https://www.ibm.com/docs/en/was/latest?topic=viewer-logging-performance-data-tivoli-performance"
   print "       7. https://www.ibm.com/docs/api/v1/content/SSAW57_9.0.5/com.ibm.websphere.javadoc.doc/web/mbeanDocs/Perf.html"
+  print "       8. https://www.ibm.com/docs/api/v1/content/SSAW57_9.0.5/com.ibm.websphere.javadoc.doc/web/mbeanDocs/TivoliPerfEngine.html"
   print "       "
   sys.exit(1)
 
@@ -297,8 +298,8 @@ for nodeObject in nodeList:
       info("Calling TivoliPerfEngine.stopLogging on " + display)
       AdminControl.invoke_jmx(mbeanObjectName, "stopLogging", params, sig)
 
-      info("Calling TivoliPerfEngine.disableServer on " + display)
-      AdminControl.invoke_jmx(mbeanObjectName, "disableServer", params, sig)
+      # info("Calling TivoliPerfEngine.disableServer on " + display)
+      # AdminControl.invoke_jmx(mbeanObjectName, "disableServer", params, sig)
 
       affectedCount = affectedCount + 1
 
