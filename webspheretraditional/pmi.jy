@@ -1,5 +1,5 @@
 # *****************************************************************************
-#  (c) Copyright IBM Corporation 2024.
+#  (c) Copyright IBM Corporation 2025.
 # 
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -80,10 +80,22 @@ numFiles = 5
 outputType = "xml" # or "bin"
 bufferSize = 40
 pmilevel = ""
+
 pmicustom_builtsin = {}
-pmicustom_builtsin["common1"] = "beanModule=1,2,9,11,12,25,26,34,35,36,37,38,39,40,41,42,43,44,27,18,29,28:connectionPoolModule=1,2,5,6,7,9,12,13:j2cModule=1,2,5,6,7,12,13:jvmRuntimeModule=*:odrStatModule=*,1,2,3,4,5,6:servletSessionsModule=6,7:threadPoolModule=3,4,6,7,8:transactionModule=4,14,16:webAppModule=11,13"
+
+# https://www.ibm.com/docs/en/was/latest?topic=organization-jdbc-connection-pool-counters
+# https://www.ibm.com/docs/en/was/latest?topic=organization-enterprise-bean-counters
+# https://www.ibm.com/docs/en/was/latest?topic=organization-thread-pool-counters
+# https://www.ibm.com/docs/en/was/latest?topic=organization-java-virtual-machine-counters
+# https://www.ibm.com/docs/en/was/latest?topic=organization-transaction-counters
+# https://www.ibm.com/docs/en/was/latest?topic=organization-web-application-counters
+# https://www.ibm.com/docs/en/was/latest?topic=organization-servlet-session-counters
+pmicustom_builtsin["common1"] = "beanModule=1,2,10,11,12,18,26,27,54:connectionPoolModule=1,2,5,6,7,8,9,12,13,21,22:j2cModule=1,2,5,6,7,12,13:jvmRuntimeModule=2,3,4,5:servletSessionsModule=6,7:threadPoolModule=1,2,3,4,6,7,8,9:transactionModule=4,14,16:webAppModule=11,13,14,18"
+
 pmicustom_builtsin["sib"] = "StatGroup.SIBService=1543,1530,1540,1541,1542,1544,1545,1546,1551,1550,1552,1508,1509,1510,1511,1556,1557,1558,18,2,4,5,11,19,20,21,22:StatGroup.SIBService>StatGroup.Communications>StatGroup.Clients>StatGroup.ClientsStandard=561,560,563,562:beanModule=1,2,9,11,12,25,26,34,35,36,37,38,39,40,41,42,43,44,27,18,29,28:connectionPoolModule=1,2,5,6,7,9,12,13:j2cModule=1,2,5,6,7,12,13:jvmRuntimeModule=*:odrStatModule=*,1,2,3,4,5,6:servletSessionsModule=6,7:threadPoolModule=3,4,6,7,8:transactionModule=4,14,16:webAppModule=11,13"
+
 pmicustom = pmicustom_builtsin["common1"]
+
 help = 0
 refreshRate = 30
 affectedCount = 0
