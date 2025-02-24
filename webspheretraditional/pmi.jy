@@ -16,6 +16,25 @@
 
 # pmi.jy: Start, stop, query, or configure PMI/TPV on a set of WebSphere Application Server traditional servers
 
+# Common instructions:
+# 1. Download this script to the deployment manager: https://raw.githubusercontent.com/IBM/webspherescripts/refs/heads/main/webspheretraditional/pmi.jy
+# 2. Execute the script as follows:
+#   2a. cd PATH_TO_DEPLOYMENT_MANAGER_BIN; for example, cd /opt/IBM/WebSphere/AppServer/profiles/Dmgr01/bin/
+#   2b. ./wsadmin.sh -lang jython -f PATH_TO/pmi.jy ARGUMENTS (see below); for example, ./wsadmin.sh -lang jython -f ~/pmi.jy ARGUMENTS
+#   2c. With all the commands, you choose which JVMs to apply to with [-node NODE] [-server SERVER] arguments.
+#     2ci. If you specify neither -node nor -server, then the script will run on all APPLICATION_SERVER JVMs that are running.
+#     2cii. If you specify -server SERVER, then the script will run on all APPLICATION_SERVER JVMs with the server name equal to SERVER that are running.
+#     2ciii. If you specify -node NODE, then the script will run on all APPLICATION_SERVER JVMs with the node name equal to NODE that are running.
+#     2civ. If you specify both -node NODE -server SERVER, then the script will run only on the APPLICATION_SERVER JVM on node NODE and the server name SERVER that is running.
+# 3. If you need to set PMI to something other than the default of PMI Basic, then run the following; for example:
+#   3a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action setlevel -pmilevel custom -pmicustom common1
+# 4. Start PMI logging; for example:
+#   4a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action start
+# 5. Reproduce the issue.
+# 6. Stop PMI logging; for example:
+#   6a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action stop
+# 7. Gather logs from PROFILE/logs/tpv/
+
 import sys
 import com.ibm.ws.tpv.engine.UserPreferences as UserPreferences
 import com.ibm.ws.tpv.engine.utils.ServerBean as ServerBean
@@ -350,15 +369,23 @@ for nodeObject in nodeList:
 
     elif action == "setlevel":
       target = target + ",process=" + serverName
-      perfname = AdminControl.completeObjectName("type=Perf," + target + ",*")
-      # none, basic, extended, all
-      info("Setting PMI level to " + pmilevel + " on " + serverName)
-      AdminControl.invoke(perfname, "setStatisticSet", pmilevel)
-      if pmilevel == "custom":
-        AdminControl.invoke(perfname, "setCustomSetString", [pmicustom, java.lang.Boolean('true')], ['java.lang.String', 'java.lang.Boolean'])
-      AdminControl.invoke(perfname, "savePMIConfiguration")
+      try:
+        perfname = AdminControl.completeObjectName("type=Perf," + target + ",*")
+        # none, basic, extended, custom, all
+        info("Setting PMI level to " + pmilevel + " on " + serverName)
+        AdminControl.invoke(perfname, "setStatisticSet", pmilevel)
+        if pmilevel == "custom":
+          AdminControl.invoke(perfname, "setCustomSetString", [pmicustom, java.lang.Boolean('true')], ['java.lang.String', 'java.lang.Boolean'])
+        AdminControl.invoke(perfname, "savePMIConfiguration")
 
-      affectedCount = affectedCount + 1
+        affectedCount = affectedCount + 1
+      except:
+        # Server is probably stopped
+        typ, val, tb = sys.exc_info()
+        value = `val`
+        sd = `tb.dumpStack()`
+        sd = sd.replace("\\\\","/")
+        print "Could not call setStatisticSet/setCustomSetString for " + target + " (it might just be stopped)"
 
     elif action == "debug":
       info("Debug")
