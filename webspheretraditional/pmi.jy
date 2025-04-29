@@ -30,10 +30,12 @@
 #   3a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action setlevel -pmilevel custom -pmicustom common1
 # 4. Start PMI logging; for example:
 #   4a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action start
-# 5. Reproduce the issue.
-# 6. Stop PMI logging; for example:
-#   6a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action stop
-# 7. Gather logs from PROFILE/logs/tpv/
+# 5. List PMI logging to verify; for example:
+#   5a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action list
+# 6. Reproduce the issue.
+# 7. Stop PMI logging; for example:
+#   7a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action stop
+# 8. Gather logs from PROFILE/logs/tpv/
 
 import sys
 import com.ibm.ws.tpv.engine.UserPreferences as UserPreferences
@@ -54,7 +56,7 @@ def usage():
   print "       If -pmilevel is custom, then specify the counters with -pmicustom (applied recursively)"
   print "       Built-in suggestions may be chosen from: sib"
   print "       To find custom PMI counters, either:"
-  print "       1. Enable custom counters at runtime through the console and then dump them with AdminControl.invoke(AdminControl.completeObjectName('type=Perf,node=NODE,process=SERVER,*'), 'getCustomSetString') and clean up to remove redundant recursive entries"
+  print "       1. Enable custom counters at runtime through the console and then dump them with `print AdminControl.invoke(AdminControl.completeObjectName('type=Perf,process=server2,*'), 'getCustomSetString')` and clean up to remove redundant recursive entries"
   print "       2. Find in the javadocs, e.g. https://www.ibm.com/docs/api/v1/content/SSAW57_9.0.5/com.ibm.websphere.javadoc.doc/web/apidocs/constant-values.html?view=embed#com.ibm.websphere.pmi.stat.WSJCAConnectionPoolStats.AllocateCount"
   print "       See the initialization in the source code of the pmicustom variable for an example"
   print "       "
@@ -110,8 +112,9 @@ pmicustom_builtsin = {}
 # https://www.ibm.com/docs/en/was/latest?topic=organization-web-application-counters
 # https://www.ibm.com/docs/en/was/latest?topic=organization-servlet-session-counters
 pmicustom_builtsin["common1"] = "beanModule=1,2,10,11,12,18,26,27,54:connectionPoolModule=1,2,5,6,7,8,9,12,13,21,22:j2cModule=1,2,5,6,7,12,13:jvmRuntimeModule=2,3,4,5:servletSessionsModule=6,7:threadPoolModule=1,2,3,4,6,7,8,9:transactionModule=4,14,16:webAppModule=11,13,14,18"
-
-pmicustom_builtsin["sib"] = "StatGroup.SIBService=1543,1530,1540,1541,1542,1544,1545,1546,1551,1550,1552,1508,1509,1510,1511,1556,1557,1558,18,2,4,5,11,19,20,21,22:StatGroup.SIBService>StatGroup.Communications>StatGroup.Clients>StatGroup.ClientsStandard=561,560,563,562:beanModule=1,2,9,11,12,25,26,34,35,36,37,38,39,40,41,42,43,44,27,18,29,28:connectionPoolModule=1,2,5,6,7,9,12,13:j2cModule=1,2,5,6,7,12,13:jvmRuntimeModule=*:odrStatModule=*,1,2,3,4,5,6:servletSessionsModule=6,7:threadPoolModule=3,4,6,7,8:transactionModule=4,14,16:webAppModule=11,13"
+pmicustom_builtsin["sib"] = pmicustom_builtsin["common1"] + ":StatGroup.SIBService=1543,1530,1540,1541,1542,1544,1545,1546,1551,1550,1552,1508,1509,1510,1511,1556,1557,1558,18,2,4,5,11,19,20,21,22:StatGroup.SIBService>StatGroup.Communications>StatGroup.Clients>StatGroup.ClientsStandard=561,560,563,562"
+pmicustom_builtsin["dynacache"] = pmicustom_builtsin["common1"] + ":cacheModule=21,22,23,24,25,26,27,28,29,30,31,32,34,35,36"
+pmicustom_builtsin["wxs"] = pmicustom_builtsin["dynacache"] + ":mapModule=3,1,6,2,4,5:objectGridModule=1"
 
 pmicustom = pmicustom_builtsin["common1"]
 
