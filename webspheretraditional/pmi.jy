@@ -27,14 +27,14 @@
 #     2ciii. If you specify -node NODE, then the script will run on all APPLICATION_SERVER JVMs with the node name equal to NODE that are running.
 #     2civ. If you specify both -node NODE -server SERVER, then the script will run only on the APPLICATION_SERVER JVM on node NODE and the server name SERVER that is running.
 # 3. If you need to set PMI to something other than the default of PMI Basic, then run the following; for example:
-#   3a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action setlevel -pmilevel custom -pmicustom common1
+#    ./wsadmin.sh -lang jython -f ~/pmi.jy -action setlevel -pmilevel custom -pmicustom common1
 # 4. Start PMI logging; for example:
-#   4a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action start
+#    ./wsadmin.sh -lang jython -f ~/pmi.jy -action start
 # 5. List PMI logging to verify; for example:
-#   5a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action list
+#    ./wsadmin.sh -lang jython -f ~/pmi.jy -action list
 # 6. Reproduce the issue.
 # 7. Stop PMI logging; for example:
-#   7a. ./wsadmin.sh -lang jython -f ~/pmi.jy -action stop
+#    ./wsadmin.sh -lang jython -f ~/pmi.jy -action stop
 # 8. Gather logs from PROFILE/logs/tpv/
 
 import sys
