@@ -17,9 +17,9 @@
 # pmi.jy: Start, stop, query, or configure PMI/TPV on a set of WebSphere Application Server traditional servers
 
 # Common instructions:
-# 1. Download this script to the deployment manager: https://raw.githubusercontent.com/IBM/webspherescripts/refs/heads/main/webspheretraditional/pmi.jy
+# 1. Download this script: https://raw.githubusercontent.com/IBM/webspherescripts/refs/heads/main/webspheretraditional/pmi.jy
 # 2. Execute the script as follows:
-#   2a. cd PATH_TO_DEPLOYMENT_MANAGER_BIN; for example, cd /opt/IBM/WebSphere/AppServer/profiles/Dmgr01/bin/
+#   2a. cd PATH_TO_PROFILE_BIN; for example, cd /opt/IBM/WebSphere/AppServer/profiles/Dmgr01/bin/
 #   2b. ./wsadmin.sh -lang jython -f PATH_TO/pmi.jy ARGUMENTS (see below); for example, ./wsadmin.sh -lang jython -f ~/pmi.jy ARGUMENTS
 #   2c. With all the commands, you choose which JVMs to apply to with [-node NODE] [-server SERVER] arguments.
 #     2ci. If you specify neither -node nor -server, then the script will run on all APPLICATION_SERVER JVMs that are running.
