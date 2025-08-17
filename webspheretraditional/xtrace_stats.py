@@ -44,7 +44,7 @@ def iter_lines(fp):
             continue
         yield ln, m.group('ts'), m.group('tid'), m.group('arrow'), m.group('method')
 
-def ellipsize_middle(text: str, max_len: int, ellipsis: str = "...") -> str:
+def ellipsize_method(text: str, max_len: int, ellipsis: str = "...") -> str:
     """Return text shortened with a middle ellipsis to fit max_len."""
     if max_len <= 0:
         return ""
@@ -126,6 +126,10 @@ def main():
                     help="Sort by: avg (default), count total, or method.")
     ap.add_argument("--width", type=int, default=60,
                     help="Method name column width (will center-ellipsis if too long) Default:60")
+    ap.add_argument("--max-width", type=int, default=0,
+                    help="Optional soft cap for auto width when not ellipsizing. Default: no cap.")
+    ap.add_argument("--ellipsize", action="store_true",
+                    help="Ellipsize long method names to fit --width. Default: is off.")
     args = ap.parse_args()
 
     rows = compute_stats(args.logfile)
@@ -141,14 +145,26 @@ def main():
     if args.top and args.top > 0:
         rows = rows[:args.top]
 
-    # Pretty print
-    w = max(10, args.width) # keep it name
-    header = f"{'Method':<{w}} {'Count':>7} {'Total(ms)':>12} {'Avg(ms)':>10}"
+    # Determine the column width
+    if args.ellipsize:
+        method_col_width = max(10, args.width) # user-controlled when ellipsizing
+    else:
+        # Auto-width: longest method length amoung results (fallback to 30 if no rows)
+        longest = max((len(method) for method, *_ in rows), default=0)
+        if not args.ellipsize and args.max_width and args.max_width > 0:
+            method_col_width = min(method_col_width, args.max_width)
+        else:
+            method_col_width = max(30, longest) # keep at least 30 chars for readability
+
+    # Build and print the header.
+    header = f"{'Method':<{method_col_width}} {'Count':>7} {'Total(ms)':>12} {'Avg(ms)':>10}"
     print(header)
     print("-" * len(header))
+
+    # Print the rows.
     for method, count, total_ms, avg_ms in rows:
-        name = ellipsize_middle(method, w)
-        print(f"{name:<{w}} {count:>7d} {total_ms:>12d} {avg_ms:>10.3f}")
+        name = ellipsize_method(method, args.width) if args.ellipsize else method
+        print(f"{name:<{method_col_width}} {count:>7d} {total_ms:>12d} {avg_ms:>10.3f}")
     
 if __name__ == "__main__":
     main()
