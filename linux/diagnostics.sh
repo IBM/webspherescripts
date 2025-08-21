@@ -218,7 +218,7 @@ case "${ACTION}" in
 
     # Wait a bit of time so that in case the user starts and then quickly
     # wants to stop, then we'll hopefully have gotten the first iteration of background data
-    sleep 10
+    sleep 5
 
     echo "[$(date)] Diagnostics successfully started in the background" | tee -a "${WRAPPER_OUTPUTFILE}"
     ;;
