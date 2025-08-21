@@ -219,7 +219,8 @@ case "${ACTION}" in
     df -h . | tee -a "${WRAPPER_OUTPUTFILE}"
     nohup tcpdump -nn -v -i $INTERFACE -B 4096 -s 80 -C "${TCPDUMP_MAXFILESIZE_MB}" -W "${TCPDUMP_MAXFILES}" -Z root -w ${TOOL_OUTPUTFILE_PREFIX}_tcpdump_${OUTPUTSUFFIX}.pcap >> "${TOOL_OUTPUTFILE_PREFIX}_tcpdump_${OUTPUTSUFFIX}.txt" 2>&1 &
 
-    # Start ourselves with the background action with nohup
+    # Start ourselves with the background action with nohup.
+    # The -m marker option is just so that we can find what we started with pgrep during the stop operation
     echo "[$(date)] Starting background child tasks. Please wait..." | tee -a "${WRAPPER_OUTPUTFILE}"
     nohup sh ${0} -a background -m "${TOOL_OUTPUTFILE_PREFIX}" -o "${WRAPPER_OUTPUTFILE}" -v "${VERBOSE}" -d "${DELAYSECONDS}" >> "${WRAPPER_OUTPUTFILE}" 2>&1 &
 
