@@ -1,4 +1,5 @@
 #!/bin/sh
+# diagnostics.sh: Gather various Linux and Java diagnostics
 # Copyright IBM Corporation. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 # This script is provided as-is without warranty or support.
@@ -22,7 +23,8 @@ usage() {
          -v VERBOSE: 1 to enable verbose logging and 0 to disable. Default: 0
 
 Notes:
-1. Data is collected in the current working directory. By default, tcpdump can generate up to 1GB.
+1. Data is collected in the current working directory.
+2. For the background collection (-a start), by default, tcpdump can generate up to 1GB.
 
 Example usage:
 1. Start diagnostics: ${0} -a start
