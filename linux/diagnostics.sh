@@ -171,8 +171,8 @@ collectMainData() {
   echo "[$(date)] Getting meminfo" >> "${TOOL_OUTPUTFILE_PREFIX}_meminfo_${OUTPUTSUFFIX}.txt" 2>&1
   cat /proc/meminfo >> "${TOOL_OUTPUTFILE_PREFIX}_meminfo_${OUTPUTSUFFIX}.txt" 2>&1
 
-  # We don't take javacores of NoAppServer because it's configured to create PHDs on kill -3 which are impactful and consume a lot of disk
-  for PID in $(ps -elfyww | awk '/java/ && !/java_wrapper/ && !/NoAppServer/ { print $3; }'); do
+  # We don't take javacores of NoAppServer and QueueController because they're configured to create PHDs on kill -3 which are impactful and consume a lot of disk
+  for PID in $(ps -elfyww | awk '/java/ && !/java_wrapper/ && !/NoAppServer/ && !/QueueController/ { print $3; }'); do
     echo "[$(date)] Gathering data on Java PID ${PID} ; threads = $(ps -L -p ${PID} | wc -l); javacore directory likely = $(ls -l /proc/$PID/cwd | sed 's/.*-> //g')" >> "${WRAPPER_OUTPUTFILE}" 2>&1
     echo "$(ls -l /proc/$PID/cwd | sed 's/.*-> //g')" >> "${TOOL_OUTPUTFILE_PREFIX}_java_cwds_${OUTPUTSUFFIX}.txt" 2>&1
     echo "[$(date)] Getting smaps for ${PID}" >> "${TOOL_OUTPUTFILE_PREFIX}_smaps_${OUTPUTSUFFIX}.txt" 2>&1
