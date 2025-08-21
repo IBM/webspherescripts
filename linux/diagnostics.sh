@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # This script is provided as-is without warranty or support.
 
-VERSION="0.20250821.1"
+VERSION="0.20250821.2"
 echo "$(basename "${0}") version ${VERSION} is provided as-is without warranty or support."
 
 usage() {
