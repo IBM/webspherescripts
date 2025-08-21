@@ -27,6 +27,11 @@ Notes:
 2. For the background collection (-a start), by default, tcpdump can generate up to 1GB.
 
 Example usage:
+
+A) Simple, single data collection:
+1. ${0} -a singlecollection
+
+B) Proactive data collection
 1. Start diagnostics: ${0} -a start
 2. Reproduce the problem
 3. Stop and collect diagnostics: ${0} -a collect
