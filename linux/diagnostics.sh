@@ -14,6 +14,7 @@ usage() {
             collect: Stop any running diagnostics, create a .tar.gz file and clean up files
             stop: Stop any running diagnostics
             status: Show which diagnostic commands are running
+            singlecollection: Gather a single collection of the diagnostics
          -d DELAY: Interval in seconds between various background collections. Default: 1800 (30mins)
          -f TCPDUMP_MAX_FILESIZE: Maximum file size in MB of each tcpdump file. Default: 100
          -i TCPDUMP_INTERFACE: The network interface for tcpdump to capture. Default: any (all interfaces)
@@ -139,17 +140,68 @@ printProcessTree() {
 
 echoEntry() {
   echo "[$(date)] Running $(basename "${0}") version ${VERSION} with action ${ACTION}" | tee -a "${WRAPPER_OUTPUTFILE}"
+  echo "[$(date)] Started with options: ${@}" >> "${WRAPPER_OUTPUTFILE}" 2>&1
 }
 
 echoExit() {
   echo "[$(date)] Action ${ACTION} successfully completed" | tee -a "${WRAPPER_OUTPUTFILE}"
 }
 
+collectMainData() {
+  echo "[$(date)] Executing iteration" >> "${WRAPPER_OUTPUTFILE}" 2>&1
+
+  echo "[$(date)] Executing top" >> "${TOOL_OUTPUTFILE_PREFIX}_top_${OUTPUTSUFFIX}.txt" 2>&1
+  top -b -d 2 -n 1 -o %MEM >> "${TOOL_OUTPUTFILE_PREFIX}_top_${OUTPUTSUFFIX}.txt" 2>&1
+
+  echo "[$(date)] Executing top -H" >> "${TOOL_OUTPUTFILE_PREFIX}_topH_${OUTPUTSUFFIX}.txt" 2>&1
+  top -b -H -d 2 -n 1 >> "${TOOL_OUTPUTFILE_PREFIX}_topH_${OUTPUTSUFFIX}.txt" 2>&1
+
+  echo "[$(date)] Executing netstat -antop" >> "${TOOL_OUTPUTFILE_PREFIX}_netstat_${OUTPUTSUFFIX}.txt" 2>&1
+  netstat -antop >> "${TOOL_OUTPUTFILE_PREFIX}_netstat_${OUTPUTSUFFIX}.txt" 2>&1
+
+  echo "[$(date)] Executing netstat -s" >> "${TOOL_OUTPUTFILE_PREFIX}_statistics_netstat_${OUTPUTSUFFIX}.txt" 2>&1
+  netstat -s >> "${TOOL_OUTPUTFILE_PREFIX}_statistics_netstat_${OUTPUTSUFFIX}.txt" 2>&1
+
+  echo "[$(date)] Executing ps -elfyww" >> "${TOOL_OUTPUTFILE_PREFIX}_ps_${OUTPUTSUFFIX}.txt" 2>&1
+  ps -elfyww >> "${TOOL_OUTPUTFILE_PREFIX}_ps_${OUTPUTSUFFIX}.txt" 2>&1
+
+  echo "[$(date)] Executing df" >> "${TOOL_OUTPUTFILE_PREFIX}_df_${OUTPUTSUFFIX}.txt" 2>&1
+  df -h >> "${TOOL_OUTPUTFILE_PREFIX}_df_${OUTPUTSUFFIX}.txt" 2>&1
+
+  echo "[$(date)] Getting meminfo" >> "${TOOL_OUTPUTFILE_PREFIX}_meminfo_${OUTPUTSUFFIX}.txt" 2>&1
+  cat /proc/meminfo >> "${TOOL_OUTPUTFILE_PREFIX}_meminfo_${OUTPUTSUFFIX}.txt" 2>&1
+
+  # We don't take javacores of NoAppServer because it's configured to create PHDs on kill -3 which are impactful and consume a lot of disk
+  for PID in $(ps -elfyww | awk '/java/ && !/java_wrapper/ && !/NoAppServer/ { print $3; }'); do
+    echo "[$(date)] Gathering data on Java PID ${PID} ; threads = $(ps -L -p ${PID} | wc -l); javacore directory likely = $(ls -l /proc/$PID/cwd | sed 's/.*-> //g')" >> "${WRAPPER_OUTPUTFILE}" 2>&1
+    echo "$(ls -l /proc/$PID/cwd | sed 's/.*-> //g')" >> "${TOOL_OUTPUTFILE_PREFIX}_java_cwds_${OUTPUTSUFFIX}.txt" 2>&1
+    echo "[$(date)] Getting smaps for ${PID}" >> "${TOOL_OUTPUTFILE_PREFIX}_smaps_${OUTPUTSUFFIX}.txt" 2>&1
+    cat /proc/${PID}/smaps >> "${TOOL_OUTPUTFILE_PREFIX}_smaps_${OUTPUTSUFFIX}.txt" 2>&1
+    kill -3 ${PID}
+  done
+  echo "[$(date)] Sleeping for ${DELAYSECONDS} seconds..." >> "${WRAPPER_OUTPUTFILE}" 2>&1
+}
+
+performCollect() {
+  stopDiagnostics
+  TARFILE="diag_$(hostname)_$(date +%Y%m%d_%H%M%S).tar.gz"
+  echo "[$(date)] Creating tar file ${TARFILE}..."
+  JAVACORES="$(cat ${TOOL_OUTPUTFILE_PREFIX}_java_cwds_${OUTPUTSUFFIX}.txt 2>/dev/null | sort | uniq | while read line; do ls "${line}/javacore"*; done | xargs)"
+  tar --ignore-failed-read -czf ${TARFILE} diag_output* diag_tool_output* ${JAVACORES} 2>&1 | grep -v -e "Removing leading" -e "diag_.* Warning: Cannot stat: No such file or directory"
+  if [ -f "${TARFILE}" ]; then
+    rm -f diag_output*
+    rm -f diag_tool_output*
+    rm -f ${JAVACORES}
+  fi
+  echo "[$(date)] Finished creating tar file: ${TARFILE}"
+  if command -v readlink >/dev/null 2>&1; then
+    readlink -f ${TARFILE}
+  fi
+}
+
 case "${ACTION}" in
   start)
     echoEntry
-
-    echo "[$(date)] Started $(basename "${0}") with options: ${@}" >> "${WRAPPER_OUTPUTFILE}" 2>&1
 
     # First we stop any pre-existing diagnostics in case the user forgot to clean
     # up the last run of this script.
@@ -187,20 +239,7 @@ case "${ACTION}" in
     fi
     ;;
   collect)
-    stopDiagnostics
-    TARFILE="diag_$(hostname)_$(date +%Y%m%d_%H%M%S).tar.gz"
-    echo "[$(date)] Creating tar file ${TARFILE}..."
-    JAVACORES="$(cat ${TOOL_OUTPUTFILE_PREFIX}_java_cwds_${OUTPUTSUFFIX}.txt 2>/dev/null | sort | uniq | while read line; do ls "${line}/javacore"*; done | xargs)"
-    tar --ignore-failed-read -czf ${TARFILE} diag_output* diag_tool_output* ${JAVACORES} 2>&1 | grep -v -e "Removing leading" -e "diag_.* Warning: Cannot stat: No such file or directory"
-    if [ -f "${TARFILE}" ]; then
-      rm -f diag_output*
-      rm -f diag_tool_output*
-      rm -f ${JAVACORES}
-    fi
-    echo "[$(date)] Finished creating tar file: ${TARFILE}"
-    if command -v readlink >/dev/null 2>&1; then
-      readlink -f ${TARFILE}
-    fi
+    performCollect
     ;;
   clean)
     stopDiagnostics
@@ -216,41 +255,25 @@ case "${ACTION}" in
   background)
     echo "[$(date)] Running $(basename "${0}") with action ${ACTION}" >> "${WRAPPER_OUTPUTFILE}" 2>&1
     while true; do
-      echo "[$(date)] Executing iteration" >> "${WRAPPER_OUTPUTFILE}" 2>&1
-
-      echo "[$(date)] Executing top" >> "${TOOL_OUTPUTFILE_PREFIX}_top_${OUTPUTSUFFIX}.txt" 2>&1
-      top -b -d 2 -n 1 -o %MEM >> "${TOOL_OUTPUTFILE_PREFIX}_top_${OUTPUTSUFFIX}.txt" 2>&1
-
-      echo "[$(date)] Executing top -H" >> "${TOOL_OUTPUTFILE_PREFIX}_topH_${OUTPUTSUFFIX}.txt" 2>&1
-      top -b -H -d 2 -n 1 >> "${TOOL_OUTPUTFILE_PREFIX}_topH_${OUTPUTSUFFIX}.txt" 2>&1
-
-      echo "[$(date)] Executing netstat -antop" >> "${TOOL_OUTPUTFILE_PREFIX}_netstat_${OUTPUTSUFFIX}.txt" 2>&1
-      netstat -antop >> "${TOOL_OUTPUTFILE_PREFIX}_netstat_${OUTPUTSUFFIX}.txt" 2>&1
-
-      echo "[$(date)] Executing netstat -s" >> "${TOOL_OUTPUTFILE_PREFIX}_statistics_netstat_${OUTPUTSUFFIX}.txt" 2>&1
-      netstat -s >> "${TOOL_OUTPUTFILE_PREFIX}_statistics_netstat_${OUTPUTSUFFIX}.txt" 2>&1
-
-      echo "[$(date)] Executing ps -elfyww" >> "${TOOL_OUTPUTFILE_PREFIX}_ps_${OUTPUTSUFFIX}.txt" 2>&1
-      ps -elfyww >> "${TOOL_OUTPUTFILE_PREFIX}_ps_${OUTPUTSUFFIX}.txt" 2>&1
-
-      echo "[$(date)] Executing df" >> "${TOOL_OUTPUTFILE_PREFIX}_df_${OUTPUTSUFFIX}.txt" 2>&1
-      df -h >> "${TOOL_OUTPUTFILE_PREFIX}_df_${OUTPUTSUFFIX}.txt" 2>&1
-
-      echo "[$(date)] Getting meminfo" >> "${TOOL_OUTPUTFILE_PREFIX}_meminfo_${OUTPUTSUFFIX}.txt" 2>&1
-      cat /proc/meminfo >> "${TOOL_OUTPUTFILE_PREFIX}_meminfo_${OUTPUTSUFFIX}.txt" 2>&1
-
-      # We don't take javacores of NoAppServer because it's configured to create PHDs on kill -3 which are impactful and consume a lot of disk
-      for PID in $(ps -elfyww | awk '/java/ && !/java_wrapper/ && !/NoAppServer/ { print $3; }'); do
-        echo "[$(date)] Gathering data on Java PID ${PID} ; threads = $(ps -L -p ${PID} | wc -l); javacore directory likely = $(ls -l /proc/$PID/cwd | sed 's/.*-> //g')" >> "${WRAPPER_OUTPUTFILE}" 2>&1
-        echo "$(ls -l /proc/$PID/cwd | sed 's/.*-> //g')" >> "${TOOL_OUTPUTFILE_PREFIX}_java_cwds_${OUTPUTSUFFIX}.txt" 2>&1
-        echo "[$(date)] Getting smaps for ${PID}" >> "${TOOL_OUTPUTFILE_PREFIX}_smaps_${OUTPUTSUFFIX}.txt" 2>&1
-        cat /proc/${PID}/smaps >> "${TOOL_OUTPUTFILE_PREFIX}_smaps_${OUTPUTSUFFIX}.txt" 2>&1
-        kill -3 ${PID}
-      done
-      echo "[$(date)] Sleeping for ${DELAYSECONDS} seconds..." >> "${WRAPPER_OUTPUTFILE}" 2>&1
+      collectMainData
       sleep ${DELAYSECONDS}
     done
     echo "[$(date)] Action ${ACTION} successfully completed" >> "${WRAPPER_OUTPUTFILE}" 2>&1
+    ;;
+  singlecollection)
+    echoEntry
+
+    # First we stop any pre-existing diagnostics in case the user forgot to clean
+    # up the last run of this script.
+    stopDiagnostics
+
+    echo "[$(date)] Performing single collection" | tee -a "${WRAPPER_OUTPUTFILE}"
+
+    collectMainData
+
+    echo "[$(date)] Gathering and packaging files" | tee -a "${WRAPPER_OUTPUTFILE}"
+
+    performCollect
     ;;
   *)
     echo "ERROR: Unknown action ${ACTION}"
