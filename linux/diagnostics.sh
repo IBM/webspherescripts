@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # This script is provided as-is without warranty or support.
 
-VERSION="0.20250821.2"
+VERSION="0.20250822.1"
 echo "$(basename "${0}") version ${VERSION} is provided as-is without warranty or support."
 
 usage() {
@@ -136,6 +136,8 @@ stopDiagnostics() {
   top -b -d 2 -n 1 >> ${TOOL_OUTPUTFILE_PREFIX}_basicinfo_${OUTPUTSUFFIX}.txt 2>&1
   echo "Gathering df" >> ${TOOL_OUTPUTFILE_PREFIX}_basicinfo_${OUTPUTSUFFIX}.txt 2>&1
   df -h >> ${TOOL_OUTPUTFILE_PREFIX}_basicinfo_${OUTPUTSUFFIX}.txt 2>&1
+  echo "Gathering sysctl" >> ${TOOL_OUTPUTFILE_PREFIX}_basicinfo_${OUTPUTSUFFIX}.txt 2>&1
+  sysctl -a >> ${TOOL_OUTPUTFILE_PREFIX}_basicinfo_${OUTPUTSUFFIX}.txt 2>&1
 }
 
 printProcessTree() {
@@ -184,7 +186,7 @@ collectMainData() {
     echo "$(ls -l /proc/$PID/cwd | sed 's/.*-> //g')" >> "${TOOL_OUTPUTFILE_PREFIX}_java_cwds_${OUTPUTSUFFIX}.txt" 2>&1
     echo "[$(date)] Getting smaps for ${PID}" >> "${TOOL_OUTPUTFILE_PREFIX}_smaps_${OUTPUTSUFFIX}.txt" 2>&1
     cat /proc/${PID}/smaps >> "${TOOL_OUTPUTFILE_PREFIX}_smaps_${OUTPUTSUFFIX}.txt" 2>&1
-    kill -3 ${PID}
+    kill -3 ${PID} >> "${TOOL_OUTPUTFILE_PREFIX}_smaps_${OUTPUTSUFFIX}.txt" 2>&1
   done
   echo "[$(date)] Sleeping for ${DELAYSECONDS} seconds..." >> "${WRAPPER_OUTPUTFILE}" 2>&1
 }
